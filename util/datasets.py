@@ -1,94 +1,106 @@
-# Copyright (c) Meta Platforms, Inc. and affiliates.
-# All rights reserved.
-# Partly revised by YZ @UCL&Moorfields
-# --------------------------------------------------------
 import os
-from torchvision import datasets, transforms
-from torch.utils.data import Dataset
-from PIL import Image
-import numpy as np
 import pandas as pd
+from PIL import Image
+import torch
+from torch.utils.data import Dataset
+from torchvision import datasets, transforms
 from timm.data import create_transform
 from timm.data.constants import IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD
 
-# define the pretrained dataset
-class GetData(Dataset):
-    def __init__(self, root_dir, pre_train=False, progression=False, transform=None):
-        self.root_dir = root_dir
-        self.transform = transform
-        self.pre_train = pre_train
-        self.progression = progression
+class GetData_s1e(Dataset):
+	def __init__(self, path, dft, transform):
+		self.path = path
+		self.transform = transform
+		self.file = dft
 
-        file_path = os.path.join(self.root_dir, "ground_truth.csv")
-        self.file = pd.read_csv(file_path)
-        self.path = os.path.join(self.root_dir, "fundus")
-        self.img_path_list = os.listdir(self.path)
+	def __getitem__(self, k):
+		pid = self.file.iloc[k,0]
+		label = torch.tensor([self.file.iloc[k, p] for p in range(3, self.file.shape[1])], dtype=torch.long)
+		fts = []
+		for pt in range(1,3):
+			img_name = self.file.iloc[k, pt]
+			img_item_path = os.path.join(self.path, img_name)
+			img = Image.open(img_item_path)
+			img = self.transform(img)
+			fts.append(img)
 
-    def __getitem__(self, k):
-        img_name = self.file.iloc[k,0]
-        img_item_path = os.path.join(self.path, img_name)
-        img = Image.open(img_item_path)
-        if self.pre_train:
-            label = torch.tensor([self.file.iloc[k,p] for p in range(3)], dtype=torch.long)
-        elif self.progression:
-            label = torch.tensor([self.file.iloc[k,p] for p in range(5)], dtype=torch.long)
-        else:
-            label = self.file.iloc[k,1]
+		return pid, fts, label
 
-        if self.transform:
-            img = self.transform(img)
+	def __len__(self):
+		return self.file.shape[0]
 
-        return img, img_name, label
+class GetData_fts(Dataset):
+	def __init__(self, dft, meta_nums):
+		self.meta_nums = meta_nums
+		self.file = dft
 
-    def __len__(self):
-        return len(self.img_path_list)
+	def __getitem__(self, k):
+		pid = self.file.iloc[k,0]
+		label = torch.tensor([self.file.iloc[k, p] for p in range(2 * self.meta_nums + 1, self.file.shape[1])],
+							 dtype=torch.long)
+		fts = []
+		for pt in range(2):
+			fts.append(torch.tensor(self.file.iloc[k, pt * self.meta_nums + 1:(pt + 1) * self.meta_nums + 1].to_numpy().astype("float"),
+									dtype=torch.float))
 
-def build_dataset(is_train, args):
-    transform = build_transform(is_train, args)
-    root = os.path.join(args.data_path, is_train)
-    if args.pre_train:
-        dataset = GetData(root, pre_train=True, transform=transform)
-    elif args.progression:
-        dataset = GetData(root, progression=True, transform=transform)
-    else:
-        #dataset = GetData(root, transform=transform)
-        dataset = datasets.ImageFolder(root, transform=transform)
+		return pid, fts, label
 
-    return dataset
+	def __len__(self):
+		return self.file.shape[0]
 
+class GetData_s4(Dataset):
+	def __init__(self, path, dft, transform):
+		self.path = path
+		self.transform = transform
+		self.file = dft
 
-def build_transform(is_train, args):
-    mean = IMAGENET_DEFAULT_MEAN
-    std = IMAGENET_DEFAULT_STD
-    # train transform
-    if is_train=='train':
-        # this should always dispatch to transforms_imagenet_train
-        transform = create_transform(
-            input_size=args.input_size,
-            is_training=True,
-            color_jitter=args.color_jitter,
-            auto_augment=args.aa,
-            interpolation='bicubic',
-            re_prob=args.reprob,
-            re_mode=args.remode,
-            re_count=args.recount,
-            mean=mean,
-            std=std,
-        )
-        return transform
+	def __getitem__(self, k):
+		pid = self.file.iloc[k,0]
+		label_0 = torch.tensor([self.file.iloc[k, p] for p in range(3, self.file.shape[1]-4)],
+							   dtype=torch.long)
+		label_s1 = torch.tensor(self.file.iloc[k, self.file.shape[1]-4:self.file.shape[1]-2].to_numpy().astype("float"),
+								dtype=torch.float)
+		label_s2 = torch.tensor(self.file.iloc[k, self.file.shape[1] - 2:self.file.shape[1]].to_numpy().astype("float"),
+								dtype=torch.float)
+		label = [label_0, label_s1, label_s2]
+		fts = []
+		for pt in range(1,3):
+			img_name = self.file.iloc[k, pt]
+			img_item_path = os.path.join(self.path, img_name)
+			img = Image.open(img_item_path)
+			img = self.transform(img)
+			fts.append(img)
 
-    # eval transform
-    t = []
-    if args.input_size <= 224:
-        crop_pct = 224 / 256
-    else:
-        crop_pct = 1.0
-    size = int(args.input_size / crop_pct)
-    t.append(
-        transforms.Resize(size, interpolation=transforms.InterpolationMode.BICUBIC), 
-    )
-    t.append(transforms.CenterCrop(args.input_size))
-    t.append(transforms.ToTensor())
-    t.append(transforms.Normalize(mean, std))
-    t.append(transforms.RandomRotation(30)) # add image rotation
-    return transforms.Compose(t)
+		return pid, fts, label
+
+	def __len__(self):
+		return self.file.shape[0]
+
+def build_dataset(is_train, dft, stage, meta_nums=None, data_path=None):
+	transform = build_transform(is_train)
+	if stage == 1 or stage == "e":
+		dataset = GetData_s1e(data_path, dft, transform=transform)
+	elif stage == 4:
+		dataset = GetData_s4(data_path, dft, transform=transform)
+	else:
+		dataset = GetData_fts(dft, meta_nums)
+
+	return dataset
+
+def build_transform(is_train):
+	if is_train=='train':
+		transform = transforms.Compose([
+			transforms.RandomRotation(degrees=180, fill=128),
+			transforms.RandomHorizontalFlip(p=0.5),
+			transforms.RandomApply(torch.nn.ModuleList([transforms.ColorJitter(brightness=0.5,
+																			   contrast=0.5,
+																			   saturation=0.5,
+																			   hue=0.5)]), p=0.5),
+			transforms.RandomApply(torch.nn.ModuleList([transforms.GaussianBlur(5, (5,9))]), p=0.3),
+			transforms.ToTensor()
+		])
+		return transform
+	else:
+		transform = transforms.ToTensor()
+		return transform
+	
