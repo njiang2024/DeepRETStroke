@@ -1,8 +1,3 @@
-# Copyright (c) Meta Platforms, Inc. and affiliates.
-# All rights reserved.
-# Partly revised by YZ @UCL&Moorfields
-# --------------------------------------------------------
-
 from functools import partial
 
 import torch
