@@ -30,7 +30,7 @@ import pickle
 
 from engine_finetune import train_one_epoch, evaluate
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "3"
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 def get_args_parser():
 	parser = argparse.ArgumentParser('DeepRETStroke System Development', add_help=False)
