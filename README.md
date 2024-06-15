@@ -30,23 +30,26 @@ pip install -r requirement.txt
 ### Preparing the dataset
 
 
-JPG and PNG formats are recommended. The input image must be 3-channel color fundus images. For training and testing the fundus model, fundus images should be stored in the input file folder, and the relative storage path of each image (e.g. "images/train_1.jpg") should be filled in the CSV file. Examples of CSV file are shown below:
+JPG and PNG formats are recommended. The input image must be 3-channel color fundus images. For training and testing the fundus model, fundus images should be stored in the input file folder, and the name of each image (e.g. "train_1.jpg") should be filled in the CSV file. Examples of CSV file are shown below:
 
 
 **CSV file for SBI detection task**
-| patient id | eye1 | eye2 | diagnosis |
-| -  | -  | - | -   |
-| 0  | images/train_1.jpg | images/train_1.jpg | 0 |
+|patient id|gender|ever-smoker at baseline|baseline hypertension|baseline t2dm|baseline age|baseline SBP|baseline HDL-c|baseline total cholesterol|baseline BMI|eye1|eye2|diagnosis|
+| - | - | - | - | - | - | - | - | - | - | - | - | - |
+| 0  | 1 | 0 | 0 | 0 | 50 | 139 | 1.3 | 4.9 | 24.5 | train_1.jpg | train_2.jpg | 0 |
 
 
 **CSV file for incident stroke prediction task**
-| patient id | eye1 | eye2 | progression_year_1 | progression_year_2 | progression_year_3 | progression_year_4 | progression_year_5 |
-| -  | -  | - | -    | - | -    | - | -    |
-| 0  | images/train_1.jpg | images/train_1.jpg | 0 | 0 | 0 | 0 | 1 |
+|patient id|gender|ever-smoker at baseline|baseline hypertension|baseline t2dm|baseline age|baseline SBP|baseline HDL-c|baseline total cholesterol|baseline BMI|eye1|eye2|progression_year_1|progression_year_2|progression_year_3|progression_year_4|progression_year_5|
+| - | - | - | - | - | - | - | - | - | - | - | - | - | - | - | - | - |
+| 0  | 1 | 0 | 0 | 0 | 50 | 139 | 1.3 | 4.9 | 24.5 |train_1.jpg | train_2.jpg | 0 | 0 | 0 | 0 | 1 |
 
+For development of the DeepRETStroke System, 4 csv file should be prepared in the **data** folder. **df_sb_tr.csv** is the training set for SBI Detection, **df_sb_va.csv** is the testing set for SBI Detection, **df_st_tr.csv** is the training set for Stroke Prediction and 
+**df_st_va.csv** is the testing set for Stroke Prediction,
 
-### Training for DeepSTROKE
+### Training for DeepRETStroke System
 
+Run the following command in the terminal to start the system development. **--data_path** should be changed to the custom path of the fundus images. **--finetune** should be set as the primitive encoder of the system, of which the default setting **RETFound_cfp_weights.pth** is an open-source pre-trained model RETFound, a pre-trained foundation model for generalizable disease detection. The weight of RETFound can be downloaded [here](https://github.com/rmaphoh/RETFound_MAE).
 
 ```
 python -m torch.distributed.launch --nproc_per_node=1 --master_port=48798 main_finetune.py \
@@ -59,5 +62,3 @@ python -m torch.distributed.launch --nproc_per_node=1 --master_port=48798 main_f
     --task ./deepstroke/ \
     --finetune ./RETFound_cfp_weights.pth \
     --input_size 256
-
-```
