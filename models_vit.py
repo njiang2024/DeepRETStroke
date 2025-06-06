@@ -131,14 +131,12 @@ class VisionTransformer2(timm.models.vision_transformer.VisionTransformer):
     def forward(self, x):
         photos, metadata, stage = x
 
-        # 在stage1，photos为眼底照片
         if stage == 1:
             y = self.forward_features(photos)
             y = self.head_5(self.hidden_layer(y))
 
             return y
 
-        # 在stage2，photos为左右眼列表[p0,p1], metadata为模型训练标记列表[a,b]
         if stage == 2:
             if metadata[0] == 1:
                 y0 = self.head_2_0(self.hidden_layer_0(photos[0]))
@@ -151,7 +149,6 @@ class VisionTransformer2(timm.models.vision_transformer.VisionTransformer):
 
             return y0, y1
 
-        # 在stage4，photos为眼底照片
         if stage == 4:
             y = self.forward_features(photos)
             y0 = self.head_2_t(self.hidden_layer_t(y))
@@ -159,7 +156,6 @@ class VisionTransformer2(timm.models.vision_transformer.VisionTransformer):
 
             return y0, y1
 
-        # 在detector finetuning，photos为左右特征列表[p0,p1], metadata为模型训练标记列表[a,b]
         if stage == "fd":
             if metadata[0] == 1:
                 y0 = self.head_c2_0(self.hidden_layer_c_0(photos[0]))
@@ -172,13 +168,11 @@ class VisionTransformer2(timm.models.vision_transformer.VisionTransformer):
 
             return y0, y1
 
-        # 在predictor finetuning，photos为特征列表
         if stage == "fp":
             y = self.head_c5(self.hidden_layer_c(photos))
 
             return y
 
-        # 在特征提取阶段，photos为眼底照片
         if stage == "e":
             y = self.forward_features(photos)
 
